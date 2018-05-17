@@ -178,6 +178,39 @@ class ProxyAuthControllerTest(unittest.TestCase):
         self.assertEquals(resp_rw['full_name'], 'Henrik')
         self.assertTrue(resp_rw['is_readonly'])
 
+    def test_environ_over_headers_default(self):
+        cfg = create_cfg({
+            'header': 'REMOTE_USER',
+            'trusted_proxies': '127.0.0.1',
+            'full_name_header': 'FULLNAME',
+            'rw_header': 'RW_GROUPS',
+            'rw_split': ';',
+            'rw_values': 'sei;npe',
+            'ro_header': 'RO_GROUPS',
+            'ro_split': ',',
+            'ro_values': 'manager,viewer',
+        })
+        req_rw = MockRequest('192.168.0.3', headers={
+            'REMOTE_USER': 'htj',
+            'FULLNAME': 'Henrik',
+            'RW_GROUPS': 'viewer',
+            'RO_GROUPS': 'viewer',
+        },environ={
+            'REMOTE_USER': 'htj-env',
+            'FULLNAME': 'Henrik-env',
+            'RW_GROUPS': 'viewer',
+            'RO_GROUPS': 'viewer',
+        })
+
+        resp_rw = self.controller._proxy_auth_config(cfg, req_rw)
+
+        self.assertTrue(resp_rw['is_ready'])
+        self.assertTrue(resp_rw['is_configured'])
+        self.assertTrue(resp_rw['is_trusted'])
+        self.assertEquals(resp_rw['user'], 'htj-env')
+        self.assertEquals(resp_rw['full_name'], 'Henrik-env')
+        self.assertTrue(resp_rw['is_readonly'])
+
 
 class ProxyIsReadOnly(unittest.TestCase):
 
