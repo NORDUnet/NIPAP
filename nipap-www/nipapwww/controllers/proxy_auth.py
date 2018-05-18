@@ -20,6 +20,8 @@ class ProxyAuthController(BaseController):
         """
         cfg = NipapConfig()
         proxy_conf = self._proxy_auth_config(cfg, request)
+        if proxy_conf['debug']:
+            print("Proxy auth status", proxy_conf)
         if not proxy_conf['is_ready'] or not proxy_conf['user']:
             if not proxy_conf['is_trusted']:
                 log.warning('Untrusted proxy {} tried to log in'.format(request.remote_addr))
@@ -48,6 +50,7 @@ class ProxyAuthController(BaseController):
             return value
 
         use_env = get('use_env')
+        debug = not not get('debug')
         auth_header = get('header', 'X-Remote-User')
         trusted_proxies = get('trusted_proxies', '127.0.0.1').split()
         full_name_header = get('full_name_header')
@@ -67,8 +70,12 @@ class ProxyAuthController(BaseController):
         if use_env or auth_header in request.environ:
             is_trusted = True
             headers = request.environ
+            if debug:
+                print('Using ENV Headers', headers)
         else:
             headers = request.headers
+            if debug:
+                print('Using HTTP Headers', headers.items())
             # XXX: proper cider check?
             is_trusted = request.remote_addr in trusted_proxies
             if '*' in trusted_proxies:
@@ -83,8 +90,10 @@ class ProxyAuthController(BaseController):
                 full_name = headers[full_name_header]
 
         # Check if user has write access
-        user_ro = headers[ro_header] if ro_header and ro_header in headers else []
-        user_rw = headers[rw_header] if rw_header and rw_header in headers else []
+        user_ro = headers[ro_header] if ro_header and ro_header in headers else ''
+        user_rw = headers[rw_header] if rw_header and rw_header in headers else ''
+        if debug:
+            print('ro', user_ro, 'rw', user_rw, 'ro_values', ro_values, 'rw_values', rw_values)
         # Default is rw if nothing has been set
         is_readonly, auth_failed = self._is_readonly(user_ro=user_ro, user_rw=user_rw, ro_allowed=ro_values, rw_allowed=rw_values, ro_split=ro_split, rw_split=rw_split)
 
@@ -95,7 +104,8 @@ class ProxyAuthController(BaseController):
             'is_ready': auth_proxy_configured and is_trusted and not auth_failed,
             'user': user,
             'is_readonly': is_readonly,
-            'full_name': full_name
+            'full_name': full_name,
+            'debug': debug,
         }
 
     def _is_readonly(self, user_ro=None, user_rw=None, ro_allowed=[], rw_allowed=[], ro_split=None, rw_split=None):
